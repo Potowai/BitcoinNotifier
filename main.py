@@ -14,7 +14,6 @@ def check_price_changes():
     previous_price = get_bitcoin_price()
     
     while True:
-        playsound("80s synthé sound.wav")
         current_price = get_bitcoin_price()
         price_diff = current_price - previous_price
         
