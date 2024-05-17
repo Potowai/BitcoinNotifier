@@ -2,21 +2,22 @@ import requests
 import time
 import customtkinter as ctk
 import threading
-
-# Constantes
-TIME_TO_SLEEP = 15  # secondes
-API_URL = 'https://api.coingecko.com/api/v3/simple/price?ids=bitcoin&vs_currencies=eur'
-CUSTOM_FONT = ("Helvetica", 16, "bold")
+from settings import *
 
 class BitcoinPriceApp(ctk.CTk):
     def __init__(self):
         super().__init__()
-
-        self.title("Bitcoin Price Notifier")
-        self.geometry("400x70")
+        print("Initialisation de l'application...")
+        self.title("")
+        self.iconbitmap(EMPTY_ICON)
+        self.geometry("450x100")
+        self.resizable(False, False)
+        self.eval('tk::PlaceWindow . center')  # Centrer la fenêtre
+        self.percentage_label = ctk.CTkLabel(self, font=PERCENTAGE_FONT)
+        self.percentage_label.pack(pady=(10, 10))
 
         self.label = ctk.CTkLabel(self, text="Prix du Bitcoin : Récupération en cours...", font=CUSTOM_FONT)
-        self.label.pack(pady=20)
+        self.label.pack(pady=(0, 10))
 
         self.initial_price = None
         self.previous_price = None
@@ -36,25 +37,29 @@ class BitcoinPriceApp(ctk.CTk):
 
     def update_price(self):
         current_price = self.get_bitcoin_price()
+        color = "white"
         if current_price is not None:
             if self.initial_price is None:
                 self.initial_price = current_price
 
-            change = current_price - self.initial_price
-            if change > 0:
+            price_diff = current_price - self.initial_price
+            percentage_change = ((current_price - self.initial_price) / self.initial_price) * 100
+
+            if price_diff > 0:
                 color = "green"
-                change_text = f"(↑ {change}€ depuis le lancement)"
-            elif change < 0:
+                label_text = f"(↑ {price_diff}€ depuis le lancement)"
+                percentage_text = f"↑ {percentage_change:.2f}%"
+            elif price_diff < 0:
                 color = "red"
-                change_text = f"(↓ {-change}€ depuis le lancement)"
+                label_text = f"(↓ {-price_diff}€ depuis le lancement)"
+                percentage_text = f"↓ {percentage_change:.2f}%"
             else:
-                color = "black"
-                change_text = "(→ 0€ depuis le lancement)"
-            
-            self.label.configure(text=f"Prix du Bitcoin : {current_price}€ {change_text}", text_color=color)
+                label_text = "(→ 0€ depuis le lancement)"
+                percentage_text = "→ 0%"
+
+            self.label.configure(text=f"Prix du Bitcoin : {current_price}€ {label_text}", text_color=color)
+            self.percentage_label.configure(text=percentage_text, text_color=color)
             self.previous_price = current_price
-        else:
-            self.label.configure(text="Erreur lors de la récupération du prix", text_color="black")
 
     def start_updating(self):
         def update_loop():
@@ -66,7 +71,6 @@ class BitcoinPriceApp(ctk.CTk):
         thread.start()
 
 if __name__ == "__main__":
-    ctk.set_appearance_mode("light")  # Utiliser le mode d'apparence clair
-    ctk.set_default_color_theme("blue")  # Utiliser le thème de couleur bleu
+    ctk.set_appearance_mode("dark")  # Utiliser le mode d'apparence clair
     app = BitcoinPriceApp()
     app.mainloop()
