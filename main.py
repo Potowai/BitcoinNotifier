@@ -1,71 +1,72 @@
-import json
-import os
 import requests
 import time
-from customtkinter import CTk, CTkLabel
-from playsound import playsound
+import customtkinter as ctk
+import threading
 
-# Chemin vers le fichier JSON
-JSON_FILE = "previous_price.json"
+# Constantes
+TIME_TO_SLEEP = 15  # secondes
+API_URL = 'https://api.coingecko.com/api/v3/simple/price?ids=bitcoin&vs_currencies=eur'
+CUSTOM_FONT = ("Helvetica", 16, "bold")
 
-# Fonction pour obtenir le prix actuel du Bitcoin
-def get_bitcoin_price():
-    url = 'https://api.coingecko.com/api/v3/simple/price?ids=bitcoin&vs_currencies=eur'
-    response = requests.get(url)
-    data = response.json()
-    try:
-        return data['bitcoin']['eur']
-    except KeyError:
-        print("Error occurred while fetching the price. Retrying...")
-        time.sleep(5)
-        return get_bitcoin_price()
+class BitcoinPriceApp(ctk.CTk):
+    def __init__(self):
+        super().__init__()
 
-# Fonction pour récupérer le prix précédent à partir du fichier JSON
-def get_previous_price():
-    if os.path.exists(JSON_FILE):
-        with open(JSON_FILE, "r") as file:
-            return json.load(file)
-    else:
-        return None
+        self.title("Bitcoin Price Notifier")
+        self.geometry("400x70")
 
-# Fonction pour enregistrer le prix actuel dans le fichier JSON
-def save_current_price(price):
-    with open(JSON_FILE, "w") as file:
-        json.dump(price, file)
-        print("Price saved successfully!")
+        self.label = ctk.CTkLabel(self, text="Prix du Bitcoin : Récupération en cours...", font=CUSTOM_FONT)
+        self.label.pack(pady=20)
 
-# Fonction principale pour vérifier les changements de prix
-def check_price_changes():
-    previous_price = get_previous_price()
-    if previous_price is None:
-        previous_price = get_bitcoin_price()
-        save_current_price(previous_price)
-    
-    while True:
-        current_price = get_bitcoin_price()
-        price_label.configure(text=f"Bitcoin price: {current_price}€")
-        price_diff = current_price - previous_price
-        
-        if abs(price_diff) >= 1000:
-            if price_diff > 0:
-                print("Bitcoin gained 1000€!")
+        self.initial_price = None
+        self.previous_price = None
+
+        self.update_price()  # Appel initial pour récupérer le prix
+        self.start_updating()  # Démarrer le thread pour mise à jour en direct
+
+    def get_bitcoin_price(self):
+        try:
+            response = requests.get(API_URL)
+            response.raise_for_status()
+            data = response.json()
+            price = data["bitcoin"]["eur"]
+            return price
+        except (requests.RequestException, KeyError):
+            return None
+
+    def update_price(self):
+        current_price = self.get_bitcoin_price()
+        if current_price is not None:
+            if self.initial_price is None:
+                self.initial_price = current_price
+
+            change = current_price - self.initial_price
+            if change > 0:
+                color = "green"
+                change_text = f"(↑ {change}€ depuis le lancement)"
+            elif change < 0:
+                color = "red"
+                change_text = f"(↓ {-change}€ depuis le lancement)"
             else:
-                print("Bitcoin lost 1000€!")
-            playsound("path_to_your_wav_file.wav")  # Remplacez par le chemin de votre fichier .wav
-            previous_price = current_price
-            save_current_price(previous_price)
-        
-        time.sleep(10)  # Vérifier toutes les minutes
+                color = "black"
+                change_text = "(→ 0€ depuis le lancement)"
+            
+            self.label.configure(text=f"Prix du Bitcoin : {current_price}€ {change_text}", text_color=color)
+            self.previous_price = current_price
+        else:
+            self.label.configure(text="Erreur lors de la récupération du prix", text_color="black")
 
-# Créer une fenêtre
-window = CTk()
+    def start_updating(self):
+        def update_loop():
+            while True:
+                self.update_price()
+                time.sleep(TIME_TO_SLEEP)
 
-# Créer un widget Label pour afficher le prix
-price_label = CTkLabel(window, text="Bitcoin price: Loading...")
-price_label.pack()
+        thread = threading.Thread(target=update_loop, daemon=True)
+        thread.start()
 
-window.after(0, check_price_changes)
-
-# Démarrer la boucle principale de l'interface graphique
-window.mainloop()
-
+if __name__ == "__main__":
+    ctk.set_appearance_mode("light")  # Utiliser le mode d'apparence clair
+    ctk.set_default_color_theme("blue")  # Utiliser le thème de couleur bleu
+    app = BitcoinPriceApp()
+    app.mainloop()
